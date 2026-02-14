@@ -1,0 +1,12 @@
+[
+  {
+    "id": 0,
+    "content": "Authentication using OAuth 2.0 requires client ID and secret.",
+    "metadata": {"source": "auth.md"}
+  },
+  {
+    "id": 1,
+    "content": "API keys can be generated from the dashboard settings page.",
+    "metadata": {"source": "api.md"}
+  }
+]
