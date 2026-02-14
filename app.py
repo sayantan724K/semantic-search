@@ -5,37 +5,55 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# ------------------------
+# -------------------------
+# Enable CORS (IMPORTANT)
+# -------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# -------------------------
+# Root endpoint (optional but helpful)
+# -------------------------
+@app.get("/")
+def root():
+    return {"message": "Semantic Search API is running"}
+
+# -------------------------
 # Load Documents
-# ------------------------
+# -------------------------
 with open("docs.json", "r", encoding="utf-8") as f:
     DOCUMENTS = json.load(f)
 
 TOTAL_DOCS = len(DOCUMENTS)
 
-# ------------------------
-# TF-IDF Vectorizer
-# ------------------------
+# -------------------------
+# TF-IDF Vectorization
+# -------------------------
 corpus = [doc["content"] for doc in DOCUMENTS]
-
 vectorizer = TfidfVectorizer(stop_words="english")
 doc_vectors = vectorizer.fit_transform(corpus)
 
-# ------------------------
+# -------------------------
 # Request Model
-# ------------------------
+# -------------------------
 class SearchRequest(BaseModel):
     query: str
     k: int = 5
     rerank: bool = True
     rerankK: int = 3
 
-# ------------------------
-# Normalize Scores
-# ------------------------
+# -------------------------
+# Normalize Scores (0–1)
+# -------------------------
 def normalize(scores):
     min_s = np.min(scores)
     max_s = np.max(scores)
@@ -45,9 +63,9 @@ def normalize(scores):
 
     return [(float(s - min_s) / float(max_s - min_s)) for s in scores]
 
-# ------------------------
+# -------------------------
 # Search Endpoint
-# ------------------------
+# -------------------------
 @app.post("/search")
 def search(req: SearchRequest):
     start = time.time()
@@ -65,7 +83,7 @@ def search(req: SearchRequest):
     # Vectorize query
     query_vector = vectorizer.transform([req.query])
 
-    # Cosine similarity
+    # Compute cosine similarity
     similarities = cosine_similarity(query_vector, doc_vectors).flatten()
 
     normalized_scores = normalize(similarities)
@@ -79,10 +97,11 @@ def search(req: SearchRequest):
             "metadata": DOCUMENTS[i]["metadata"]
         })
 
+    # Sort descending
     results.sort(key=lambda x: x["score"], reverse=True)
+
     top_k = results[:req.k]
 
-    # Simple rerank (same similarity refinement)
     reranked = False
     if req.rerank and top_k:
         reranked = True
@@ -98,3 +117,4 @@ def search(req: SearchRequest):
             "totalDocs": TOTAL_DOCS
         }
     }
+
